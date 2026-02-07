@@ -6,6 +6,7 @@ import {
   generalSettingsStore,
   llmProviderStore,
   analyticsSettingsStore,
+  ProviderTypeEnum,
 } from '@extension/storage';
 import { t } from '@extension/i18n';
 import BrowserContext from './browser/context';
@@ -67,7 +68,41 @@ analyticsSettingsStore.subscribe(() => {
 });
 
 // Listen for simple messages (e.g., from options page)
-chrome.runtime.onMessage.addListener(() => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  // Handle ChatGPT Web service messages
+  if (message.type === 'CHATGPT_WEB_CHECK_LOGIN') {
+    import('./services/chatgptWeb').then(async ({ getAccessToken }) => {
+      try {
+        const session = await getAccessToken();
+        if (session) {
+          sendResponse({ loggedIn: true, user: session.user, expiry: session.expiry });
+        } else {
+          sendResponse({ loggedIn: false });
+        }
+      } catch (error) {
+        sendResponse({ loggedIn: false, error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+    return true; // Indicates async response
+  }
+
+  if (message.type === 'CHATGPT_WEB_FETCH_MODELS') {
+    import('./services/chatgptWeb').then(async ({ getAccessToken, getModelNames }) => {
+      try {
+        const session = await getAccessToken();
+        if (!session) {
+          sendResponse({ models: [], error: 'Not logged in to ChatGPT. Please log in at chatgpt.com first.' });
+          return;
+        }
+        const models = await getModelNames(session.accessToken);
+        sendResponse({ models });
+      } catch (error) {
+        sendResponse({ models: [], error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+    return true; // Indicates async response
+  }
+
   // Handle other message types if needed in the future
   // Return false if response is not sent asynchronously
   // return false;
@@ -287,15 +322,39 @@ async function setupExecutor(taskId: string, task: string, browserContext: Brows
   if (!navigatorModel) {
     throw new Error(t('bg_setup_noNavigatorModel'));
   }
-  // Log the provider config being used for the navigator
-  const navigatorProviderConfig = providers[navigatorModel.provider];
+
+  // For ChatGPT Web providers, fetch the access token dynamically
+  const navigatorProviderConfig = { ...providers[navigatorModel.provider] };
+  if (navigatorProviderConfig.type === ProviderTypeEnum.ChatGPTWeb) {
+    const { getAccessToken } = await import('./services/chatgptWeb');
+    const session = await getAccessToken();
+    if (!session) {
+      throw new Error('ChatGPT Web: Not logged in. Please log into chatgpt.com and click "Check Login" in settings.');
+    }
+    navigatorProviderConfig.accessToken = session.accessToken;
+  }
   const navigatorLLM = createChatModel(navigatorProviderConfig, navigatorModel);
 
   let plannerLLM: BaseChatModel | null = null;
   const plannerModel = agentModels[AgentNameEnum.Planner];
   if (plannerModel) {
-    // Log the provider config being used for the planner
-    const plannerProviderConfig = providers[plannerModel.provider];
+    // For ChatGPT Web providers, fetch the access token dynamically
+    const plannerProviderConfig = { ...providers[plannerModel.provider] };
+    if (plannerProviderConfig.type === ProviderTypeEnum.ChatGPTWeb) {
+      // Reuse the token if we already fetched it for navigator
+      if (navigatorProviderConfig.accessToken) {
+        plannerProviderConfig.accessToken = navigatorProviderConfig.accessToken;
+      } else {
+        const { getAccessToken } = await import('./services/chatgptWeb');
+        const session = await getAccessToken();
+        if (!session) {
+          throw new Error(
+            'ChatGPT Web: Not logged in. Please log into chatgpt.com and click "Check Login" in settings.',
+          );
+        }
+        plannerProviderConfig.accessToken = session.accessToken;
+      }
+    }
     plannerLLM = createChatModel(plannerProviderConfig, plannerModel);
   }
 

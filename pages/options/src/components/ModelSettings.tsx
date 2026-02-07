@@ -412,6 +412,10 @@ export const ModelSettings = ({ isDarkMode = false }: ModelSettingsProps) => {
     } else if (providerType === ProviderTypeEnum.Llama) {
       // Llama needs API Key and Base URL
       hasInput = Boolean(config?.apiKey?.trim()) && Boolean(config?.baseUrl?.trim());
+    } else if (providerType === ProviderTypeEnum.ChatGPTWeb) {
+      // ChatGPT Web doesn't need API key - it uses browser session
+      // Just needs at least one model to be selected
+      hasInput = Boolean(config?.modelNames?.length);
     } else {
       // Other built-in providers just need API Key
       hasInput = Boolean(config?.apiKey?.trim());
@@ -1174,12 +1178,14 @@ export const ModelSettings = ({ isDarkMode = false }: ModelSettingsProps) => {
                     </div>
                   </div>
 
-                  {/* Show message for newly added providers */}
-                  {modifiedProviders.has(providerId) && !providersFromStorage.has(providerId) && (
-                    <div className={`mb-2 text-sm ${isDarkMode ? 'text-teal-300' : 'text-teal-700'}`}>
-                      <p>{t('options_models_providers_setupInstructions')}</p>
-                    </div>
-                  )}
+                  {/* Show message for newly added providers (except ChatGPT Web) */}
+                  {modifiedProviders.has(providerId) &&
+                    !providersFromStorage.has(providerId) &&
+                    providerConfig.type !== ProviderTypeEnum.ChatGPTWeb && (
+                      <div className={`mb-2 text-sm ${isDarkMode ? 'text-teal-300' : 'text-teal-700'}`}>
+                        <p>{t('options_models_providers_setupInstructions')}</p>
+                      </div>
+                    )}
 
                   <div className="space-y-3">
                     {/* Name input (only for custom_openai) - moved to top for prominence */}
@@ -1223,78 +1229,80 @@ export const ModelSettings = ({ isDarkMode = false }: ModelSettingsProps) => {
                       </div>
                     )}
 
-                    {/* API Key input with label */}
-                    <div className="flex items-center">
-                      <label
-                        htmlFor={`${providerId}-api-key`}
-                        className={`w-20 text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {t('options_models_providers_apiKey')}
-                        {/* Show asterisk only if required */}
-                        {providerConfig.type !== ProviderTypeEnum.CustomOpenAI &&
-                        providerConfig.type !== ProviderTypeEnum.Ollama
-                          ? '*'
-                          : ''}
-                      </label>
-                      <div className="relative flex-1">
-                        <input
-                          id={`${providerId}-api-key`}
-                          type="password"
-                          placeholder={
-                            providerConfig.type === ProviderTypeEnum.CustomOpenAI
-                              ? t('options_models_providers_apiKey_placeholder_optional')
-                              : providerConfig.type === ProviderTypeEnum.Ollama
-                                ? t('options_models_providers_apiKey_placeholder_ollama')
-                                : t('options_models_providers_apiKey_placeholder_required')
-                          }
-                          value={providerConfig.apiKey || ''}
-                          onChange={e => handleApiKeyChange(providerId, e.target.value, providerConfig.baseUrl)}
-                          className={`w-full rounded-md border text-sm ${isDarkMode ? 'border-slate-600 bg-slate-700 text-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-800' : 'border-gray-300 bg-white text-gray-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-200'} p-2 outline-none`}
-                        />
-                        {/* Show eye button only for newly added providers */}
-                        {modifiedProviders.has(providerId) && !providersFromStorage.has(providerId) && (
-                          <button
-                            type="button"
-                            className={`absolute right-2 top-1/2 -translate-y-1/2 ${
-                              isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                            onClick={() => toggleApiKeyVisibility(providerId)}
-                            aria-label={
-                              visibleApiKeys[providerId]
-                                ? t('options_models_providers_apiKey_hide')
-                                : t('options_models_providers_apiKey_show')
-                            }>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="size-5"
-                              aria-hidden="true">
-                              <title>
-                                {visibleApiKeys[providerId]
+                    {/* API Key input with label - hidden for ChatGPT Web */}
+                    {providerConfig.type !== ProviderTypeEnum.ChatGPTWeb && (
+                      <div className="flex items-center">
+                        <label
+                          htmlFor={`${providerId}-api-key`}
+                          className={`w-20 text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {t('options_models_providers_apiKey')}
+                          {/* Show asterisk only if required */}
+                          {providerConfig.type !== ProviderTypeEnum.CustomOpenAI &&
+                          providerConfig.type !== ProviderTypeEnum.Ollama
+                            ? '*'
+                            : ''}
+                        </label>
+                        <div className="relative flex-1">
+                          <input
+                            id={`${providerId}-api-key`}
+                            type="password"
+                            placeholder={
+                              providerConfig.type === ProviderTypeEnum.CustomOpenAI
+                                ? t('options_models_providers_apiKey_placeholder_optional')
+                                : providerConfig.type === ProviderTypeEnum.Ollama
+                                  ? t('options_models_providers_apiKey_placeholder_ollama')
+                                  : t('options_models_providers_apiKey_placeholder_required')
+                            }
+                            value={providerConfig.apiKey || ''}
+                            onChange={e => handleApiKeyChange(providerId, e.target.value, providerConfig.baseUrl)}
+                            className={`w-full rounded-md border text-sm ${isDarkMode ? 'border-slate-600 bg-slate-700 text-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-800' : 'border-gray-300 bg-white text-gray-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-200'} p-2 outline-none`}
+                          />
+                          {/* Show eye button only for newly added providers */}
+                          {modifiedProviders.has(providerId) && !providersFromStorage.has(providerId) && (
+                            <button
+                              type="button"
+                              className={`absolute right-2 top-1/2 -translate-y-1/2 ${
+                                isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                              onClick={() => toggleApiKeyVisibility(providerId)}
+                              aria-label={
+                                visibleApiKeys[providerId]
                                   ? t('options_models_providers_apiKey_hide')
-                                  : t('options_models_providers_apiKey_show')}
-                              </title>
-                              {visibleApiKeys[providerId] ? (
-                                <>
-                                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                                  <circle cx="12" cy="12" r="3" />
-                                  <line x1="2" y1="22" x2="22" y2="2" />
-                                </>
-                              ) : (
-                                <>
-                                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                                  <circle cx="12" cy="12" r="3" />
-                                </>
-                              )}
-                            </svg>
-                          </button>
-                        )}
+                                  : t('options_models_providers_apiKey_show')
+                              }>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="size-5"
+                                aria-hidden="true">
+                                <title>
+                                  {visibleApiKeys[providerId]
+                                    ? t('options_models_providers_apiKey_hide')
+                                    : t('options_models_providers_apiKey_show')}
+                                </title>
+                                {visibleApiKeys[providerId] ? (
+                                  <>
+                                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                    <line x1="2" y1="22" x2="22" y2="2" />
+                                  </>
+                                ) : (
+                                  <>
+                                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                  </>
+                                )}
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Display API key for newly added providers only when visible */}
                     {modifiedProviders.has(providerId) &&
@@ -1543,6 +1551,99 @@ export const ModelSettings = ({ isDarkMode = false }: ModelSettingsProps) => {
                             className={`ml-1 ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}>
                             {t('options_models_providers_ollama_learnMore')}
                           </a>
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ChatGPT Web info section with interactive controls */}
+                    {providerConfig.type === ProviderTypeEnum.ChatGPTWeb && (
+                      <div
+                        className={`mt-4 rounded-md border ${isDarkMode ? 'border-green-800 bg-green-900/30' : 'border-green-200 bg-green-50'} p-3`}>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                          <strong className={`${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>
+                            ChatGPT Web Login:{' '}
+                          </strong>
+                          Uses your existing{' '}
+                          <a
+                            href="https://chatgpt.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}>
+                            chatgpt.com
+                          </a>{' '}
+                          browser session instead of an API key.
+                        </p>
+
+                        {/* Action buttons */}
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                // Use chrome.runtime to message the background script
+                                const response = await chrome.runtime.sendMessage({
+                                  type: 'CHATGPT_WEB_CHECK_LOGIN',
+                                });
+                                if (response?.loggedIn) {
+                                  alert(`✅ Logged in as: ${response.user?.email || 'Unknown'}`);
+                                } else {
+                                  alert('❌ Not logged in. Please log into chatgpt.com first.');
+                                }
+                              } catch (error) {
+                                alert(
+                                  `Error checking login: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                                );
+                              }
+                            }}
+                            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                              isDarkMode
+                                ? 'bg-blue-700 text-white hover:bg-blue-600'
+                                : 'bg-blue-500 text-white hover:bg-blue-600'
+                            }`}>
+                            Check Login
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const response = await chrome.runtime.sendMessage({
+                                  type: 'CHATGPT_WEB_FETCH_MODELS',
+                                });
+                                if (response?.models && response.models.length > 0) {
+                                  // Update the provider's model names directly
+                                  const newModels = response.models as string[];
+                                  setProviders(prev => ({
+                                    ...prev,
+                                    [providerId]: {
+                                      ...prev[providerId],
+                                      modelNames: newModels,
+                                    },
+                                  }));
+                                  setModifiedProviders(prev => new Set(prev).add(providerId));
+                                  alert(`✅ Fetched ${newModels.length} models: ${newModels.join(', ')}`);
+                                } else if (response?.error) {
+                                  alert(`❌ Error: ${response.error}`);
+                                } else {
+                                  alert('❌ No models found. Please ensure you are logged into chatgpt.com.');
+                                }
+                              } catch (error) {
+                                alert(
+                                  `Error fetching models: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                                );
+                              }
+                            }}
+                            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                              isDarkMode
+                                ? 'bg-green-700 text-white hover:bg-green-600'
+                                : 'bg-green-500 text-white hover:bg-green-600'
+                            }`}>
+                            Fetch Models
+                          </button>
+                        </div>
+
+                        <p className={`mt-2 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Click "Fetch Models" to automatically discover available models from your ChatGPT account.
                         </p>
                       </div>
                     )}

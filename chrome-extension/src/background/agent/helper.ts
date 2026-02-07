@@ -8,6 +8,7 @@ import { ChatCerebras } from '@langchain/cerebras';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatDeepSeek } from '@langchain/deepseek';
+import { ChatChatGPTWeb } from './chatgpt_web_model';
 
 const maxTokens = 1024 * 4;
 
@@ -380,6 +381,30 @@ export function createChatModel(providerConfig: ProviderConfig, modelConfig: Mod
       args.configuration = configuration;
 
       return new ChatLlama(args);
+    }
+    case ProviderTypeEnum.ChatGPTWeb: {
+      // ChatGPT Web uses browser session for authentication
+      // We need to dynamically fetch the access token at runtime
+      // Note: This is a synchronous function but we import the module to get the token
+      // The token will be fetched when this case is executed
+      let accessToken = providerConfig.accessToken || providerConfig.apiKey;
+
+      // If no stored token, we'll need to inform the user to check login
+      // In runtime, the background message handler will have populated the token
+      if (!accessToken) {
+        throw new Error(
+          `ChatGPT Web: Not logged in. Please click "Check Login" in the extension settings to verify your chatgpt.com session.`,
+        );
+      }
+
+      console.log('[createChatModel] Creating ChatGPT Web model:', modelConfig.modelName);
+
+      return new ChatChatGPTWeb({
+        accessToken,
+        modelName: modelConfig.modelName,
+        temperature: (modelConfig.parameters?.temperature ?? 0.7) as number,
+        topP: (modelConfig.parameters?.topP ?? 0.9) as number,
+      });
     }
     default: {
       // by default, we think it's a openai-compatible provider

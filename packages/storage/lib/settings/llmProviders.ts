@@ -16,6 +16,9 @@ export interface ProviderConfig {
   // Azure Specific Fields:
   azureDeploymentNames?: string[]; // Azure deployment names array
   azureApiVersion?: string;
+  // ChatGPT Web Specific Fields:
+  accessToken?: string; // JWT access token from chatgpt.com session
+  sessionExpiry?: number; // Timestamp when session expires
 }
 
 // Interface for storing multiple LLM provider configurations
@@ -67,6 +70,8 @@ export function getProviderTypeByProviderId(providerId: string): ProviderTypeEnu
     case ProviderTypeEnum.OpenRouter:
     case ProviderTypeEnum.Groq:
     case ProviderTypeEnum.Cerebras:
+    case ProviderTypeEnum.Llama:
+    case ProviderTypeEnum.ChatGPTWeb:
       return providerId;
     default:
       return ProviderTypeEnum.CustomOpenAI;
@@ -99,6 +104,8 @@ export function getDefaultDisplayNameFromProviderId(providerId: string): string 
       return 'Cerebras';
     case ProviderTypeEnum.Llama:
       return 'Llama';
+    case ProviderTypeEnum.ChatGPTWeb:
+      return 'ChatGPT Web';
     default:
       return providerId; // Use the provider id as display name for custom providers by default
   }
@@ -148,6 +155,15 @@ export function getDefaultProviderConfig(providerId: string): ProviderConfig {
         // modelNames: [], // Not used for Azure configuration
         azureDeploymentNames: [], // Azure deployment names
         azureApiVersion: AZURE_API_VERSION, // Provide a common default API version
+        createdAt: Date.now(),
+      };
+    case ProviderTypeEnum.ChatGPTWeb:
+      return {
+        apiKey: '', // Will use accessToken instead
+        name: 'ChatGPT Web',
+        type: ProviderTypeEnum.ChatGPTWeb,
+        baseUrl: 'https://chatgpt.com/backend-api',
+        modelNames: [], // Will be fetched dynamically from user's account
         createdAt: Date.now(),
       };
     default: // Handles CustomOpenAI
@@ -248,7 +264,11 @@ export const llmProviderStore: LLMProviderStorage = {
       if (!config.apiKey?.trim()) {
         throw new Error('API Key is required for Azure OpenAI');
       }
-    } else if (providerType !== ProviderTypeEnum.CustomOpenAI && providerType !== ProviderTypeEnum.Ollama) {
+    } else if (
+      providerType !== ProviderTypeEnum.CustomOpenAI &&
+      providerType !== ProviderTypeEnum.Ollama &&
+      providerType !== ProviderTypeEnum.ChatGPTWeb
+    ) {
       if (!config.apiKey?.trim()) {
         throw new Error(`API Key is required for ${getDefaultDisplayNameFromProviderId(providerId)}`);
       }

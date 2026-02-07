@@ -19,6 +19,7 @@ export enum ProviderTypeEnum {
   Groq = 'groq',
   Cerebras = 'cerebras',
   Llama = 'llama',
+  ChatGPTWeb = 'chatgpt_web',
   CustomOpenAI = 'custom_openai',
 }
 
@@ -145,6 +146,16 @@ export const llmProviderParameters = {
     },
   },
   [ProviderTypeEnum.Llama]: {
+    [AgentNameEnum.Planner]: {
+      temperature: 0.7,
+      topP: 0.9,
+    },
+    [AgentNameEnum.Navigator]: {
+      temperature: 0.3,
+      topP: 0.85,
+    },
+  },
+  [ProviderTypeEnum.ChatGPTWeb]: {
     [AgentNameEnum.Planner]: {
       temperature: 0.7,
       topP: 0.9,
